@@ -134,14 +134,16 @@ export class Multicall {
    * @param calls The calls
    */
   public async call(
-    contractCallContexts: ContractCallContext[] | ContractCallContext
+    contractCallContexts: ContractCallContext[] | ContractCallContext,
+    blockNumber?: number
   ): Promise<ContractCallResults> {
     if (!Array.isArray(contractCallContexts)) {
       contractCallContexts = [contractCallContexts];
     }
 
     const aggregateResponse = await this.execute(
-      this.buildAggregateCallContext(contractCallContexts)
+      this.buildAggregateCallContext(contractCallContexts),
+      blockNumber
     );
 
     const returnObject: ContractCallResults = {
@@ -325,11 +327,12 @@ export class Multicall {
    * @param calls The calls
    */
   private async execute(
-    calls: AggregateCallContext[]
+    calls: AggregateCallContext[],
+    blockNumber?: number
   ): Promise<AggregateResponse> {
     switch (this._executionType) {
       case ExecutionType.web3:
-        return await this.executeWithWeb3(calls);
+        return await this.executeWithWeb3(calls, blockNumber);
       case ExecutionType.ethers:
       case ExecutionType.customHttp:
         return await this.executeWithEthersOrCustom(calls);
@@ -343,13 +346,17 @@ export class Multicall {
    * @param calls The calls context
    */
   private async executeWithWeb3(
-    calls: AggregateCallContext[]
+    calls: AggregateCallContext[],
+    blockNumber?: number
   ): Promise<AggregateResponse> {
+    const blockNumberToCheck = blockNumber ? blockNumber : null;
+    console.log(blockNumberToCheck);
     const web3 = this.getTypedOptions<MulticallOptionsWeb3>().web3Instance;
-    const networkId = await web3.eth.net.getId();
+    // const networkId = await web3.eth.net.getId();
     const contract = new web3.eth.Contract(
       this.ABI,
-      this.getContractBasedOnNetwork(networkId)
+      // this.getContractBasedOnNetwork(networkId)
+      '0xeefba1e63905ef1d7acba5a8513c70307c1ce441'
     );
 
     if (this._options.tryAggregate) {
@@ -358,7 +365,7 @@ export class Multicall {
           false,
           this.mapCallContextToMatchContractFormat(calls)
         )
-        .call()) as AggregateContractResponse;
+        .call({}, blockNumberToCheck)) as AggregateContractResponse;
 
       contractResponse.blockNumber = BigNumber.from(
         contractResponse.blockNumber
@@ -368,7 +375,7 @@ export class Multicall {
     } else {
       const contractResponse = (await contract.methods
         .aggregate(this.mapCallContextToMatchContractFormat(calls))
-        .call()) as AggregateContractResponse;
+        .call({}, blockNumberToCheck)) as AggregateContractResponse;
 
       contractResponse.blockNumber = BigNumber.from(
         contractResponse.blockNumber
